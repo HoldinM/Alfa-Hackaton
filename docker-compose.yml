@@ -1,0 +1,50 @@
+# Запуск всего проекта одной командой: docker compose up --build
+# С ИИ-объяснением решений: LLM_URL=http://ollama:11434 docker compose --profile ai up --build
+# Кабинет клиента: http://localhost:8000/   Аналитик: /bank   Swagger: /docs
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: alfa_user
+      POSTGRES_PASSWORD: alfa_password
+      POSTGRES_DB: alfa_credit_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alfa_user -d alfa_credit_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://alfa_user:alfa_password@db:5432/alfa_credit_db
+      # Вход сотрудников банка (/bank, /metrics). Для настоящего запуска задайте свои значения
+      BANK_PASSWORD: ${BANK_PASSWORD:-alfa-analyst}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-secret-change-me}
+      # Пусто — объяснение решения строится по шаблону, без ИИ
+      LLM_URL: ${LLM_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
+    ports:
+      - "8000:8000"
+
+  # Локальная языковая модель для объяснения решений. Запускается только с --profile ai.
+  # При первом старте скачивает Qwen2.5-7B-Instruct (7,6 млрд параметров, Apache 2.0).
+  ollama:
+    image: ollama/ollama:0.9.0
+    profiles: ["ai"]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 3 && ollama pull ${LLM_MODEL:-qwen2.5:7b-instruct} && wait"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+volumes:
+  postgres_data:
+  ollama_models:

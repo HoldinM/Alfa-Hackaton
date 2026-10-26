@@ -1,0 +1,1680 @@
+{
+  "info": {
+    "name": "Кредитный кабинет МСБ — API",
+    "description": "Все сценарии кейса по порядку. Запускайте целиком (Run collection): запросы передают друг другу номера заявок через переменные. Перед прогоном: docker compose up --build.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Служебное и справочники",
+      "item": [
+        {
+          "name": "Проверка сервиса",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"БД и схема в порядке\", () => { const b = pm.response.json(); pm.expect(b.database).to.equal(true); pm.expect(b.schema).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход сотрудника банка (нужен для /bank)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bank/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "login"
+              ]
+            },
+            "description": "Токен сохраняется в переменную bankToken и подставляется в запросы банка.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{bankPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.collectionVariables.set(\"bankToken\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Без входа API банка закрыт → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bank/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.expect(pm.response.code).to.equal(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Продукты",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reference/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reference",
+                "products"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Цели кредита",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reference/purposes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reference",
+                "purposes"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Демо-компании",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/demo/companies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "demo",
+                "companies"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"7 компаний\", () => pm.expect(pm.response.json().length).to.equal(7));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Одобрение → принятие → выдача (Пекарня)",
+      "item": [
+        {
+          "name": "Карточка компании (мок ЕГРЮЛ)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/companies/{{innApprove}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "companies",
+                "{{innApprove}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"компания действует\", () => pm.expect(pm.response.json().status).to.equal(\"active\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подбор кредита по тексту задачи",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/recommendations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recommendations"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innApprove}}\",\n  \"purpose_text\": \"Хотим купить новую печь для пекарни\",\n  \"requested_amount\": 5000000,\n  \"term_months\": 36\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"цель — оборудование\", () => pm.expect(pm.response.json().purpose.purpose).to.equal(\"equipment\"));",
+                  "pm.test(\"первый продукт — кредит на оборудование\", () => pm.expect(pm.response.json().recommendations[0].product_code).to.equal(\"EQUIPMENT\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подать заявку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innApprove}}\",\n  \"purpose\": \"equipment\",\n  \"product_code\": \"EQUIPMENT\",\n  \"requested_amount\": 5000000,\n  \"term_months\": 36,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки OFFER_READY\", () => pm.expect(pm.response.json().status).to.equal(\"OFFER_READY\"));",
+                  "pm.collectionVariables.set(\"appApprove\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Открыть заявку",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appApprove}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appApprove}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"есть решение ML\", () => pm.expect(pm.response.json().assessment.decision).to.equal(\"APPROVE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Принять условия",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appApprove}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appApprove}}",
+                "accept"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offer_index\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"статус заявки OFFER_ACCEPTED\", () => pm.expect(pm.response.json().status).to.equal(\"OFFER_ACCEPTED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подписать договор",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appApprove}}/sign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appApprove}}",
+                "sign"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"статус заявки ISSUED\", () => pm.expect(pm.response.json().status).to.equal(\"ISSUED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Контрпредложение (ТехноСнаб)",
+      "item": [
+        {
+          "name": "Подать заявку на 25 млн на 12 мес.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innCounter}}\",\n  \"purpose\": \"working_capital\",\n  \"product_code\": \"WORKING_CAPITAL\",\n  \"requested_amount\": 25000000,\n  \"term_months\": 12,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки COUNTER_OFFER\", () => pm.expect(pm.response.json().status).to.equal(\"COUNTER_OFFER\"));",
+                  "pm.collectionVariables.set(\"appCounter\", pm.response.json().id);",
+                  "pm.test(\"предложено меньше запрошенного\", () => pm.expect(pm.response.json().assessment.offers[0].amount < 25000000).to.equal(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Принять вариант 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appCounter}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appCounter}}",
+                "accept"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offer_index\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"статус заявки OFFER_ACCEPTED\", () => pm.expect(pm.response.json().status).to.equal(\"OFFER_ACCEPTED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Нужны данные → выписка → решение (ИП Кузнецова)",
+      "item": [
+        {
+          "name": "Подать заявку без отчётности",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innInfo}}\",\n  \"purpose\": \"working_capital\",\n  \"product_code\": \"EXPRESS\",\n  \"requested_amount\": 1500000,\n  \"term_months\": 24,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки INFO_REQUESTED\", () => pm.expect(pm.response.json().status).to.equal(\"INFO_REQUESTED\"));",
+                  "pm.collectionVariables.set(\"appInfo\", pm.response.json().id);",
+                  "pm.test(\"просят выписку\", () => pm.expect(pm.response.json().assessment.missing_data[0].field).to.equal(\"statement_csv\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Скачать демо-выписку (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/companies/{{innInfo}}/demo-statement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "companies",
+                "{{innInfo}}",
+                "demo-statement"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "// сохраняем выписку как JSON-строку, чтобы подставить в тело следующего запроса",
+                  "pm.collectionVariables.set(\"statementJson\", JSON.stringify(pm.response.text()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Загрузить выписку и пересчитать",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appInfo}}/info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appInfo}}",
+                "info"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statement_csv\": {{statementJson}},\n  \"statement_filename\": \"vypiska.csv\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"статус заявки OFFER_READY\", () => pm.expect(pm.response.json().status).to.equal(\"OFFER_READY\"));",
+                  "pm.test(\"заявка оценена второй раз\", () => pm.expect(pm.response.json().assessments_count).to.equal(2));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Ручная проверка аналитиком (СтройМонтаж)",
+      "item": [
+        {
+          "name": "Подать заявку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innManual}}\",\n  \"purpose\": \"contract\",\n  \"product_code\": \"WORKING_CAPITAL\",\n  \"requested_amount\": 8000000,\n  \"term_months\": 18,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки MANUAL_REVIEW\", () => pm.expect(pm.response.json().status).to.equal(\"MANUAL_REVIEW\"));",
+                  "pm.collectionVariables.set(\"appManual\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Очередь аналитика",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bankToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bank/applications?status=MANUAL_REVIEW",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "MANUAL_REVIEW"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"заявка в очереди\", () => pm.expect(pm.response.json().some(a => a.id === Number(pm.collectionVariables.get(\"appManual\")))).to.equal(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Решение аналитика: одобрить",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bankToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bank/applications/{{appManual}}/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications",
+                "{{appManual}}",
+                "decision"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approve\": true,\n  \"comment\": \"Адрес проверен, офис компании по адресу есть\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"статус заявки OFFER_READY\", () => pm.expect(pm.response.json().status).to.equal(\"OFFER_READY\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Отказы и другой продукт",
+      "item": [
+        {
+          "name": "Отказ: компания в ликвидации (Вектор-Трейд)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innStop}}\",\n  \"purpose\": \"working_capital\",\n  \"product_code\": \"WORKING_CAPITAL\",\n  \"requested_amount\": 3000000,\n  \"term_months\": 12,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки DECLINED\", () => pm.expect(pm.response.json().status).to.equal(\"DECLINED\"));",
+                  "pm.collectionVariables.set(\"appDeclined\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Отказ по риску с причинами (ИП Орлов)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innRisk}}\",\n  \"purpose\": \"working_capital\",\n  \"product_code\": \"EXPRESS\",\n  \"requested_amount\": 1000000,\n  \"term_months\": 24,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки DECLINED\", () => pm.expect(pm.response.json().status).to.equal(\"DECLINED\"));",
+                  "pm.collectionVariables.set(\"appRisk\", pm.response.json().id);",
+                  "pm.test(\"грейд E\", () => pm.expect(pm.response.json().assessment.risk.grade).to.equal(\"E\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Отзыв клиента: причина отказа понятна",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appRisk}}/feedback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appRisk}}",
+                "feedback"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision_clear\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"отзыв сохранён\", () => pm.expect(pm.response.json().feedback.decision_clear).to.equal(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Другой продукт: молодой бизнес просит инвестиционный (Кофе Старт)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{innAlt}}\",\n  \"purpose\": \"expansion\",\n  \"product_code\": \"INVESTMENT\",\n  \"requested_amount\": 4000000,\n  \"term_months\": 36,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки ALTERNATIVE_OFFER\", () => pm.expect(pm.response.json().status).to.equal(\"ALTERNATIVE_OFFER\"));",
+                  "pm.test(\"предложен экспресс-кредит\", () => pm.expect(pm.response.json().assessment.offer.product_code).to.equal(\"EXPRESS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "История заявок компании",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications?inn={{innApprove}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "inn",
+                  "value": "{{innApprove}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5a. Своя компания (данные вводит пользователь)",
+      "item": [
+        {
+          "name": "Отрасли",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reference/industries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reference",
+                "industries"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подбор кредита для своей компании",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/recommendations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "recommendations"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": {\n    \"name\": \"ООО «Моя пекарня»\",\n    \"legal_form\": \"OOO\",\n    \"industry\": \"food\",\n    \"business_age_months\": 48,\n    \"annual_revenue\": 40000000,\n    \"net_margin\": 0.12,\n    \"revenue_trend\": 0.1\n  },\n  \"purpose\": \"equipment\",\n  \"requested_amount\": 3000000,\n  \"term_months\": 36\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"есть подходящий продукт с переплатой\", () => { const r = pm.response.json().recommendations.filter(p => p.eligible); pm.expect(r.length > 0).to.equal(true); pm.expect(r[0].estimated_overpayment > 0).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Заявка без ИНН → синтетический ИНН и решение",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": {\n    \"name\": \"ООО «Моя пекарня»\",\n    \"legal_form\": \"OOO\",\n    \"industry\": \"food\",\n    \"business_age_months\": 48,\n    \"annual_revenue\": 40000000,\n    \"net_margin\": 0.12,\n    \"revenue_trend\": 0.1\n  },\n  \"purpose\": \"equipment\",\n  \"requested_amount\": 3000000,\n  \"term_months\": 36,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки OFFER_READY\", () => pm.expect(pm.response.json().status).to.equal(\"OFFER_READY\"));",
+                  "pm.collectionVariables.set(\"appOwn\", pm.response.json().id);",
+                  "pm.test(\"своя компания, ИНН сгенерирован\", () => { const b = pm.response.json(); pm.expect(b.own_company).to.equal(true); pm.expect(/^\\d{10}$/.test(b.inn)).to.equal(true); });",
+                  "pm.test(\"ставка разложена: база + надбавка\", () => { const o = pm.response.json().assessment.offer; pm.expect(typeof o.base_rate === \"number\" && typeof o.risk_premium_pp === \"number\").to.equal(true); pm.expect(o.overpayment > 0).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Та же компания с просрочкой 120 дней → отказ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": {\n    \"name\": \"ООО «Моя пекарня»\",\n    \"legal_form\": \"OOO\",\n    \"industry\": \"food\",\n    \"business_age_months\": 48,\n    \"annual_revenue\": 40000000,\n    \"net_margin\": 0.12,\n    \"revenue_trend\": 0.1,\n    \"bki_max_overdue_days_12m\": 120\n  },\n  \"purpose\": \"equipment\",\n  \"requested_amount\": 3000000,\n  \"term_months\": 36,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"статус заявки DECLINED\", () => pm.expect(pm.response.json().status).to.equal(\"DECLINED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Своя компания с неверным ИНН → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": {\n    \"name\": \"ООО «Моя пекарня»\",\n    \"legal_form\": \"OOO\",\n    \"industry\": \"food\",\n    \"business_age_months\": 48,\n    \"annual_revenue\": 40000000,\n    \"net_margin\": 0.12,\n    \"revenue_trend\": 0.1\n  },\n  \"purpose\": \"equipment\",\n  \"requested_amount\": 3000000,\n  \"term_months\": 36,\n  \"consent_bki\": true,\n  \"inn\": \"1234567890\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.expect(pm.response.code).to.equal(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5b. Объяснение решения простыми словами",
+      "item": [
+        {
+          "name": "Объяснить одобрение",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appOwn}}/explain",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appOwn}}",
+                "explain"
+              ]
+            },
+            "description": "Без LLM_URL ответ шаблонный (source=template). С --profile ai пишет Qwen2.5-7B (source=llm)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"есть текст и источник\", () => { const e = pm.response.json(); pm.expect(e.text.length > 0).to.equal(true); pm.expect([\"llm\", \"template\"].includes(e.source)).to.equal(true); pm.expect(e.facts.length > 0).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Объяснить отказ",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appDeclined}}/explain",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appDeclined}}",
+                "explain"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"решение — отказ\", () => pm.expect(pm.response.json().decision).to.equal(\"DECLINE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Заключение для аналитика (клиент не видит)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bankToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bank/applications/{{appOwn}}/explain",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "applications",
+                "{{appOwn}}",
+                "explain"
+              ]
+            },
+            "description": "Без LLM_URL — шаблон, с --profile ai — Qwen2.5-7B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"есть рекомендация системы\", () => pm.expect(pm.response.json().text.includes(\"Рекомендация\")).to.equal(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "В заявке клиента заключения нет",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appOwn}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appOwn}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test(\"клиент не видит заключение\", () => pm.expect(pm.response.text().includes(\"Рекомендация системы\")).to.equal(false));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Продуктовые метрики",
+      "item": [
+        {
+          "name": "Метрики по всем заявкам",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bankToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bank/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bank",
+                "metrics"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.equal(200));",
+                  "const m = pm.response.json();",
+                  "const byKey = Object.fromEntries(m.groups.flatMap(g => g.metrics).map(x => [x.key, x]));",
+                  "pm.test(\"заявки посчитаны\", () => pm.expect(m.applications_total > 0).to.equal(true));",
+                  "pm.test(\"есть конверсия до выдачи\", () => pm.expect(byKey.issue_rate.value > 0).to.equal(true));",
+                  "pm.test(\"есть доля спасённых от отказа\", () => pm.expect(byKey.saved_from_decline.value > 0).to.equal(true));",
+                  "pm.test(\"есть оценка понятности решения\", () => pm.expect(byKey.decision_clarity.value !== null).to.equal(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Ошибки",
+      "item": [
+        {
+          "name": "Некорректный ИНН → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"123\",\n  \"purpose\": \"other\",\n  \"requested_amount\": 1000000,\n  \"term_months\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.expect(pm.response.code).to.equal(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Неизвестная компания → 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"7701234567\",\n  \"purpose\": \"other\",\n  \"product_code\": null,\n  \"requested_amount\": 1000000,\n  \"term_months\": 12,\n  \"consent_bki\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.expect(pm.response.code).to.equal(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Принять условия после отказа → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/{{appDeclined}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "{{appDeclined}}",
+                "accept"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offer_index\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.expect(pm.response.code).to.equal(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Заявка не найдена → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/applications/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "applications",
+                "999999"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.expect(pm.response.code).to.equal(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "bankPassword",
+      "value": "alfa-analyst"
+    },
+    {
+      "key": "bankToken",
+      "value": ""
+    },
+    {
+      "key": "innApprove",
+      "value": "7756405021"
+    },
+    {
+      "key": "innCounter",
+      "value": "7741938122"
+    },
+    {
+      "key": "innInfo",
+      "value": "773544899576"
+    },
+    {
+      "key": "innManual",
+      "value": "7783756068"
+    },
+    {
+      "key": "innStop",
+      "value": "7742430652"
+    },
+    {
+      "key": "innRisk",
+      "value": "773013246628"
+    },
+    {
+      "key": "innAlt",
+      "value": "7718431119"
+    }
+  ]
+}

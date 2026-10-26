@@ -1,0 +1,41 @@
+[project]
+name = "alfa-credit-project"
+version = "1.0.0"
+description = "Умный кредитный кабинет предпринимателя: бэкенд кредитного конвейера + ML-модуль credit_ml"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "sqlalchemy>=2.0.35",
+    "asyncpg>=0.29.0",
+    "greenlet>=3.5.6",
+    "alembic>=1.13.3",
+    "pydantic>=2.9.2",
+    "pydantic-settings>=2.5.2",
+    "jinja2>=3.1.4",
+    "httpx>=0.27.2",
+    "scikit-learn>=1.5.2",
+    "joblib>=1.4.2",
+    "pandas>=2.2.3",
+    "numpy>=2.0",
+]
+
+# Нужны только для разработки и тестов, в Docker-образ не попадают
+[dependency-groups]
+dev = [
+    "pytest>=8.3.3",
+    "httpx>=0.27.2",
+    "aiosqlite>=0.20.0",
+    "playwright>=1.64.1",
+    "pytest-playwright>=0.10.0",
+    "pandas-stubs==3.0.5.260914",
+    "types-pandas==2.0.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

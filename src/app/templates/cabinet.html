@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Кредитный кабинет предпринимателя</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap">
+  <meta name="theme-color" content="#ef3124">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">
+    <!-- Логотип Альфа-Будущее: положите официальный файл в static/brand/logo.svg (или logo.png) -->
+    <img class="brand-logo" src="{{ url_for('static', path='brand/logo.svg') }}" alt="Альфа-Будущее"
+         onerror="if(!this.dataset.png){this.dataset.png=1;this.src=this.src.replace('logo.svg','logo.png')}else{this.remove()}">
+    <span class="brand-name">Кредитный кабинет<span class="brand-sub">для бизнеса</span></span>
+  </a>
+  <span class="demo-note">Демо на синтетических данных</span>
+</header>
+
+<div class="layout">
+  <aside class="rail" aria-label="Шаги заявки">
+    <ol id="rail">
+      <li data-step="company">Компания</li>
+      <li data-step="need">Задача</li>
+      <li data-step="product">Продукт</li>
+      <li data-step="submit">Заявка</li>
+      <li data-step="result">Решение</li>
+    </ol>
+  </aside>
+
+  <main>
+    <!-- 1. Компания -->
+    <section id="step-company">
+      <h1>Кредит для бизнеса</h1>
+      <p class="lead">Укажите компанию. Потом расскажите, на что нужны деньги, и мы подберём кредит.</p>
+      <div class="segmented" role="tablist" aria-label="Откуда взять данные компании">
+        <button role="tab" id="tabRegistry" aria-selected="true" aria-controls="paneRegistry">Из реестра</button>
+        <button role="tab" id="tabOwn" aria-selected="false" aria-controls="paneOwn">Своя компания</button>
+      </div>
+
+      <div id="paneRegistry" role="tabpanel">
+        <p class="small">Данные подтянутся из реестров ЕГРЮЛ, ФНС и БКИ (в прототипе — синтетические).</p>
+        <div class="row">
+          <div class="field">
+            <label for="demo">Демо-компания</label>
+            <select id="demo" class="input"><option value="">Выберите компанию…</option></select>
+            <span class="hint">Каждая компания показывает свой сценарий решения</span>
+          </div>
+          <div class="field">
+            <label for="inn">или ИНН</label>
+            <input id="inn" class="input" inputmode="numeric" maxlength="12" placeholder="10 или 12 цифр" autocomplete="off">
+          </div>
+        </div>
+        <button id="loadCompany" class="btn">Найти компанию</button>
+      </div>
+
+      <form id="paneOwn" role="tabpanel" hidden novalidate>
+        <p class="small">Введите данные своей компании — модель оценит именно их. Можно придумать любые значения и посмотреть, как меняется решение.</p>
+        <div class="row">
+          <div class="field"><label for="ownName">Название</label>
+            <input id="ownName" class="input" placeholder="ООО «Моя пекарня»"></div>
+          <div class="field"><label for="ownInn">ИНН</label>
+            <input id="ownInn" class="input" inputmode="numeric" maxlength="12" placeholder="Можно оставить пустым">
+            <span class="hint">Пусто — сгенерируем синтетический</span></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="ownForm">Форма</label>
+            <select id="ownForm" class="input"><option value="OOO">ООО</option><option value="IP">ИП</option></select></div>
+          <div class="field"><label for="ownIndustry">Отрасль</label>
+            <select id="ownIndustry" class="input"></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="ownAge">Сколько месяцев работает бизнес</label>
+            <input id="ownAge" class="input" type="number" min="0" value="36" required></div>
+          <div class="field"><label for="ownStatus">Статус компании</label>
+            <select id="ownStatus" class="input">
+              <option value="active">Действует</option>
+              <option value="liquidating">В процессе ликвидации</option>
+              <option value="bankruptcy">Банкротство</option>
+            </select></div>
+        </div>
+        <h3>Финансы</h3>
+        <div class="row row-3">
+          <div class="field"><label for="ownRevenue">Выручка за год, ₽</label>
+            <input id="ownRevenue" class="input" type="number" min="1" step="100000" value="30000000" required></div>
+          <div class="field"><label for="ownMargin">Прибыль, % от выручки</label>
+            <input id="ownMargin" class="input" type="number" min="-100" max="100" step="0.5" value="10" required></div>
+          <div class="field"><label for="ownTrend">Рост выручки за год, %</label>
+            <input id="ownTrend" class="input" type="number" min="-100" max="500" step="1" value="0">
+            <span class="hint">Если упала — с минусом</span></div>
+        </div>
+        <h3>Текущие кредиты</h3>
+        <div class="row">
+          <div class="field"><label for="ownDebt">Сколько осталось вернуть, ₽</label>
+            <input id="ownDebt" class="input" type="number" min="0" step="100000" value="0"></div>
+          <div class="field"><label for="ownPay">Платежи по ним в месяц, ₽</label>
+            <input id="ownPay" class="input" type="number" min="0" step="10000" value="0"></div>
+        </div>
+        <h3>Кредитная история за 12 месяцев</h3>
+        <div class="row">
+          <div class="field"><label for="ownOverdue">Самая долгая просрочка, дней</label>
+            <input id="ownOverdue" class="input" type="number" min="0" value="0"></div>
+          <div class="field"><label for="ownOverdueCnt">Сколько раз были просрочки</label>
+            <input id="ownOverdueCnt" class="input" type="number" min="0" value="0"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="ownInquiries">Заявок на кредит в другие банки за 3 мес.</label>
+            <input id="ownInquiries" class="input" type="number" min="0" value="0"></div>
+          <div class="field field-check"><span class="label-spacer" aria-hidden="true">&nbsp;</span>
+            <label class="check"><input id="ownTax" type="checkbox"><span>Есть долг по налогам</span></label></div>
+        </div>
+        <button type="submit" class="btn btn-primary">Продолжить</button>
+      </form>
+
+      <div id="companyError" class="error" hidden></div>
+      <dl id="companyCard" class="company kv" hidden></dl>
+    </section>
+
+    <!-- 2. Задача -->
+    <section id="step-need" hidden>
+      <h2>На что нужны деньги</h2>
+      <p class="lead">Опишите задачу своими словами или выберите вариант.</p>
+      <div class="field">
+        <label for="purposeText">Задача</label>
+        <input id="purposeText" class="input" placeholder="Например: купить новую печь для пекарни">
+      </div>
+      <div id="purposeChips" class="chips" role="group" aria-label="Цель кредита"></div>
+      <div class="row">
+        <div class="field">
+          <label for="amount">Сумма, ₽</label>
+          <input id="amount" class="input" type="number" min="1" step="10000" placeholder="5 000 000">
+        </div>
+        <div class="field">
+          <label for="term">Срок, месяцев</label>
+          <input id="term" class="input" type="number" min="1" max="120" placeholder="36">
+        </div>
+      </div>
+      <div class="actions">
+        <button id="findProducts" class="btn btn-primary">Подобрать кредит</button>
+        <button id="fillDemo" class="btn btn-quiet" hidden>Заполнить как в демо-сценарии</button>
+      </div>
+      <div id="needError" class="error" hidden></div>
+    </section>
+
+    <!-- 3. Продукт -->
+    <section id="step-product" hidden>
+      <h2>Подходящие кредиты</h2>
+      <p id="purposeGuess" class="lead"></p>
+      <p id="prescore" class="prescore" hidden></p>
+      <div id="products" class="products"></div>
+      <details id="unfit" class="unfit" hidden><summary></summary><div id="unfitList"></div></details>
+    </section>
+
+    <!-- 4. Заявка -->
+    <section id="step-submit" hidden>
+      <h2>Проверьте заявку</h2>
+      <table class="terms" id="summary"></table>
+      <label class="check">
+        <input id="consent" type="checkbox">
+        <span>Согласен на запрос моей кредитной истории в бюро кредитных историй</span>
+      </label>
+      <details class="more" id="manualFin">
+        <summary>Указать выручку вручную (если нет отчётности)</summary>
+        <div class="row">
+          <div class="field">
+            <label for="revenue">Выручка за год, ₽</label>
+            <input id="revenue" class="input" type="number" min="1">
+          </div>
+          <div class="field">
+            <label for="margin">Чистая прибыль, % от выручки</label>
+            <input id="margin" class="input" type="number" min="-100" max="100" step="0.1">
+          </div>
+        </div>
+      </details>
+      <button id="submitApp" class="btn btn-primary">Отправить заявку</button>
+      <div id="submitError" class="error" hidden></div>
+    </section>
+
+    <!-- 5. Решение -->
+    <section id="step-result" hidden aria-live="polite">
+      <div id="sheet"></div>
+    </section>
+
+    <!-- Мои заявки -->
+    <section id="history" hidden>
+      <h2>Заявки компании</h2>
+      <p class="small">Нажмите на заявку, чтобы открыть решение и историю.</p>
+      <table class="list">
+        <thead><tr><th>№</th><th class="num">Сумма</th><th class="num hide-sm">Срок</th><th>Статус</th><th class="hide-sm">Обновлена</th></tr></thead>
+        <tbody id="historyRows"></tbody>
+      </table>
+    </section>
+  </main>
+</div>
+<script src="{{ url_for('static', path='common.js') }}"></script>
+<script src="{{ url_for('static', path='cabinet.js') }}"></script>
+</body>
+</html>

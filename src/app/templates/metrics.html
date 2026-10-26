@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Метрики кредитного кабинета</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap">
+  <meta name="theme-color" content="#ef3124">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+<header class="top top-staff">
+  <a class="brand" href="/bank">
+    <!-- Логотип Альфа-Будущее: положите официальный файл в static/brand/logo.svg (или logo.png) -->
+    <img class="brand-logo" src="{{ url_for('static', path='brand/logo.svg') }}" alt="Альфа-Будущее"
+         onerror="if(!this.dataset.png){this.dataset.png=1;this.src=this.src.replace('logo.svg','logo.png')}else{this.remove()}">
+    <span class="brand-name">Кредитный кабинет<span class="brand-sub">для сотрудников банка</span></span>
+  </a>
+  <nav aria-label="Разделы банка">
+    <a href="/bank">Заявки</a>
+    <a href="/metrics" aria-current="page">Метрики</a>
+    <a href="/docs">API</a>
+    <a href="#" id="logout">Выйти</a>
+  </nav>
+  <span class="demo-note">Демо на синтетических данных</span>
+</header>
+<main class="metrics">
+  <h1>Метрики</h1>
+  <p class="lead" id="lead">Считаются по всем заявкам в базе. Как читать каждую — в docs/metrics.md.</p>
+  <div id="groups"></div>
+  <section class="cols2">
+    <div><h2>Решения модели</h2><div class="dist" id="decisions"></div></div>
+    <div><h2>Грейды риска</h2><div class="dist" id="grades"></div></div>
+  </section>
+  <div id="err" class="error" hidden></div>
+</main>
+<script src="{{ url_for('static', path='common.js') }}"></script>
+<script src="{{ url_for('static', path='metrics.js') }}"></script>
+</body>
+</html>

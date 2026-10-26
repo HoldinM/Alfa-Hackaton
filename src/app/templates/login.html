@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход для сотрудников банка</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap">
+  <meta name="theme-color" content="#ef3124">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+<header class="top top-staff">
+  <span class="brand">
+    <img class="brand-logo" src="{{ url_for('static', path='brand/logo.svg') }}" alt="Альфа-Будущее"
+         onerror="if(!this.dataset.png){this.dataset.png=1;this.src=this.src.replace('logo.svg','logo.png')}else{this.remove()}">
+    <span class="brand-name">Кредитный кабинет<span class="brand-sub">для сотрудников банка</span></span>
+  </span>
+</header>
+<main class="login">
+  <form id="loginForm" class="login-card" novalidate>
+    <h1>Вход для сотрудников</h1>
+    <p class="lead">Кабинет кредитного аналитика и метрики доступны только сотрудникам банка.</p>
+    <div class="field">
+      <label for="password">Пароль</label>
+      <input id="password" class="input" type="password" autocomplete="current-password" required autofocus>
+    </div>
+    <button class="btn btn-primary" type="submit">Войти</button>
+    <div id="loginError" class="error" hidden></div>
+  </form>
+</main>
+<script src="{{ url_for('static', path='common.js') }}"></script>
+<script>
+  const next = new URLSearchParams(location.search).get("next");
+  const target = next && next.startsWith("/") && !next.startsWith("//") ? next : "/bank";
+  document.getElementById("loginForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const box = document.getElementById("loginError");
+    hide(box);
+    try {
+      await api("POST", "/bank/login", { password: document.getElementById("password").value });
+      location.href = target;
+    } catch (err) { showError(box, err); }
+  };
+</script>
+</body>
+</html>
